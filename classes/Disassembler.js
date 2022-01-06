@@ -1,5 +1,10 @@
 const { INSTRUCTION_SET } = require('../data/instructionSet')
 
+/**
+ * Disassembler
+ *
+ * Decode 16-bit (2 byte) opcodes to get instructions for the CPU.
+ */
 const Disassembler = {
   disassemble(opcode) {
     // Find the instruction in which the opcode & mask equals the pattern
@@ -73,6 +78,7 @@ const Disassembler = {
     return formattedInstruction
   },
 
+  // For debugging
   dump(data) {
     const lines = data.map((code, i) => {
       const address = (i * 2).toString(16).padStart(6, '0')

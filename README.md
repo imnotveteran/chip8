@@ -1,26 +1,102 @@
-# Chip8.js [![Build Status](https://travis-ci.org/taniarascia/chip8.svg?branch=master)](https://travis-ci.org/taniarascia/chip8) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+# Chip8.js
 
-A Chip-8 emulator written in JavaScript (Node.js).
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![chip8js on NPM](https://img.shields.io/npm/v/chip8js.svg?color=green&label=chip8js)](https://www.npmjs.com/package/chip8js) [![Build Status](https://travis-ci.org/taniarascia/chip8.svg?branch=master)](https://travis-ci.org/taniarascia/chip8) [![Coverage Status](https://coveralls.io/repos/github/taniarascia/chip8/badge.svg?branch=master&service=github)](https://coveralls.io/github/taniarascia/chip8?branch=master)
+
+A Chip-8 emulator written in JavaScript.
 
 > [Chip-8](https://en.wikipedia.org/wiki/CHIP-8) is a simple, interpreted, programming language which was first used on some do-it-yourself computer systems in the late 1970s and early 1980s.
 
+### [View the demo](https://taniarascia.github.io/chip8/) | [Read the article](https://www.taniarascia.com/writing-an-emulator-in-javascript-chip8/)
+
 ## Table of Contents
 
-- [Motivation](#motivation)
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Load ROM](#load-rom)
-  - [View hex dump](#view-hex-dump)
-- [Automated Testing](#automated-testing)
+  - [Web](#web)
+  - [Terminal](#terminal)
+  - [Native](#native)
+- [Motivation](#motivation)
+- [Testing](#testing)
   - [Instruction tests](#instruction-tests)
   - [CPU tests](#cpu-tests)
-- [Todos](#todos)
 - [Acknowlegdements](#acknowledgements)
 - [License](#license)
 
+## Installation
+
+> This guide assumes you already have [Node.js](https://nodejs.org/en/) and npm installed.
+
+Prior to installing Chip8.js, you must have CMake installed.
+
+```bash
+brew install cmake
+```
+
+Clone the repository and install.
+
+```bash
+git clone git@github.com:taniarascia/chip8.git
+cd chip8
+npm i
+```
+
+## Usage
+
+Chip8.js can be run on the web, in a terminal, or using native keybindings.
+
+### Web
+
+- [Chip8.js emulator for the web](https://taniarascia.github.io/chip8/)
+
+#### Development
+
+Spin up a local server during development.
+
+```bash
+# watch for changes and rebuild
+npm run watch:web
+
+# spin up server on localhost:8080
+cd web && http-server 
+```
+
+#### Deployment
+
+Build and bundle the code for the web.
+
+```bash
+npm run build:web
+```
+
+Deploy to GitHub.
+
+```bash
+# remove web/bundle.js from .gitignore
+git add web && git commit -m "update web version"
+
+# delete gh-pages branch from origin before push
+git subtree push --prefix web origin gh-pages
+```
+
+### Terminal
+
+Run Chip8.js in the terminal by selecting a ROM.
+
+```bash
+npm run play:terminal roms/<ROM>
+```
+
+### Native
+
+Run Chip8.js natively with [raylib](https://www.npmjs.com/package/raylib) (experimental).
+
+```bash
+npm run play:native roms/<ROM>
+```
+
 ## Motivation
 
-Chip8.js is an ongoing project to write a Chip-8 emulator in JavaScript. The main motivation is to learn lower level programming concepts and to increase familiarity with the Node.js environment.
+Chip8.js is a project to write a Chip-8 emulator in JavaScript. The main motivation is to learn lower level programming concepts and to increase familiarity with the Node.js environment.
 
 Here are some of the concepts I learned while writing this program:
 
@@ -37,80 +113,18 @@ Here are some of the concepts I learned while writing this program:
 And here are some articles I wrote based on those concepts:
 
 - [Understanding Bits, Bytes, Bases, and Writing a Hex Dump in JavaScript (Node)](https://www.taniarascia.com/bits-bytes-bases-and-a-hex-dump-javascript/)
-- In progress: bitwise operators, masking, testing, and setting values.
+- [Writing an Emulator in JavaScript (with Multiple UIs)](https://www.taniarascia.com/writing-an-emulator-in-javascript-chip8/)
 
-## Installation
-
-> This guide assumes you already have [Node.js](https://nodejs.org/en/) and [Yarn](https://yarnpkg.com/en/) installed.
-
-You can add the module directly from the [chip8js](https://www.npmjs.com/package/chip8js) npm package.
-
-```bash
-yarn add chip8js
-# npm i chip8js
-```
-
-And require the `RomBuffer` and `CPU` classes.
-
-```js
-// index.js
-const { RomBuffer, CPU } = require('chip8js')
-```
-
-Or you can clone the repo. The only dependency of Chip8.js is [jest](https://jestjs.io/) for testing. Run `yarn` to install.
-
-```bash
-git clone git@github.com:taniarascia/chip8.git
-cd chip8
-yarn
-```
-
-## Usage
-
-Chip-8 compatible ROMs can be saved in the `roms/` directory. A copy of _Connect 4_ is shipped with Chip8.js (at `roms/CONNECT4`) for example and testing purposes.
-
-### Load ROM
-
-Create a ROM buffer of a ROM and load the data into the CPU. Execute the program.
-
-```bash
-yarn start roms/<ROM>
-```
-
-### View hex dump
-
-View a 16-bit hex dump of a ROM. (View more information on [bits, bytes, bases, and hex dumps](https://www.taniarascia.com/bits-bytes-bases-and-a-hex-dump-javascript/)).
-
-```bash
-yarn hexdump roms/<ROM>
-```
-
-The output will look something like this (using `CONNECT4` as an example).
-
-```bash
-000000 121a 434f 4e4e 4543 5434 2062 7920 4461
-000010 7669 6420 5749 4e54 4552 a2bb f665 a2b4
-000020 f655 6900 6801 6b00 6d0f 6e1f a2a5 600d
-000030 6132 6200 d02f d12f 720f 321e 1234 d021
-...
-```
-
-### Run example ROM
-
-```
-yarn example
-```
-
-## Automated Testing
+## Testing
 
 The unit tests for Chip8.js use the Jest testing framework. You can run all test suites with or without displaying coverage.
 
 ```bash
 # Run test suites
-yarn test
+npm run test
 
 # Run test suites and view coverage
-yarn test --coverage
+npm run test --coverage
 ```
 
 Chip8.js has two suites of unit tests:
@@ -195,35 +209,28 @@ In this example, the instruction can either be skipped or not skipped depending 
 ```js
 // tests/cpu.test.js
 
-test('6: SE_VX_NN (3xnn) - Program counter should increment by two bytes if register x is not equal to nn argument', async () => {
+test('6: SE_VX_NN (3xnn) - Program counter should increment by two bytes if register x is not equal to nn argument', () => {
   cpu.load({ data: [0x3abb] })
-  await cpu.step()
+  cpu.step()
 
   expect(cpu.PC).toBe(0x202)
 })
 
-test('6: SE_VX_NN (3xnn) - Program counter should increment by four bytes if register x is equal to nn argument', async () => {
+test('6: SE_VX_NN (3xnn) - Program counter should increment by four bytes if register x is equal to nn argument', () => {
   cpu.load({ data: [0x3abb] })
   cpu.registers[0xa] = 0xbb
-  await cpu.step()
+
+  cpu.step()
 
   expect(cpu.PC).toBe(0x204)
 })
 ```
 
-## Todos
-
-- [ ] Fix speed and timers
-- [ ] Web I/O
-- [ ] Libui I/O
-- [ ] Convert to TypeScript
-- [ ] Write an assembler
-
 ## Acknowledgements
 
-- Inspiration, guidance, and mentorship from [Vanya Sergeev](https://sergeev.io)
-- [Cowgod's Chip-8 Technical Reference](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#8xy3), made by Thomas P. Greene
-- [CHIP-8 - Wikipedia](https://en.wikipedia.org/wiki/CHIP-8)
+- Inspiration, guidance, and mentorship from [Vanya Sergeev](https://sergeev.io).
+- [Cowgod's Chip-8 Technical Reference](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#8xy3), made by Thomas P. Greene.
+- [CHIP-8 - Wikipedia](https://en.wikipedia.org/wiki/CHIP-8).
 
 ## Author
 

@@ -3,27 +3,33 @@ const Disassembler = require('./Disassembler')
 const FONT_SET = require('../data/fontSet')
 const { DISPLAY_HEIGHT, DISPLAY_WIDTH } = require('../data/constants')
 
+/**
+ * CPU
+ *
+ * The main Chip8.js CPU. All game related logic and instructions live within
+ * the CPU. The CPU can be instantiated with an interface of choice.
+ */
 class CPU {
   /**
-   * @param { class } cpuInterface I/O for Chip8
+   * @param { CpuInterface } cpuInterface I/O for Chip8
    */
   constructor(cpuInterface) {
     this.interface = cpuInterface
+
+    this.reset()
   }
 
   /**
    * Set or reset the state to initial values.
    *
    * Memory - 4kb (4096 bytes) memory storage (8-bit)
-   * Registers (16 * 8-bit) V0 through VF; VF is a flag
-   * Stack (16 * 16-bit)
-   * I - stores memory addresses
+   * Registers - (16 * 8-bit) V0 through VF; VF is a flag
+   * Stack - (16 * 16-bit)
    * ST - Sound Timer (8-bit)
    * DT - Delay Timer (8-bit)
-   * PC - Program Counter (8-bit) stores currently executing address
+   * I - stores memory addresses
    * SP - Stack Pointer (8-bit) points at topost level of stack
-   *
-   * Any time an error would cause program execution to halt, halted is set to true
+   * PC - Program Counter (8-bit) stores currently executing address
    */
   reset() {
     this.memory = new Uint8Array(4096)
@@ -34,7 +40,7 @@ class CPU {
     this.I = 0
     this.SP = -1
     this.PC = 0x200
-    this.halted = false
+    this.halted = true
     this.soundEnabled = false
   }
 
@@ -51,9 +57,11 @@ class CPU {
     const romData = romBuffer.data
     let memoryStart = 0x200
 
+    this.halted = false
+
     // Place ROM data in memory starting at 0x200
-    // Since memory is stored in an 8-bit array and opcodes are 16-bit, we have to store the opcodes
-    // across two indices in memory
+    // Since memory is stored in an 8-bit array and opcodes are 16-bit, we have
+    // to store the opcodes across two indices in memory
     for (let i = 0; i < romData.length; i++) {
       // set the first index with the most significant byte (i.e., 0x1234 would be 0x12)
       this.memory[memoryStart + 2 * i] = romData[i] >> 8
@@ -80,7 +88,11 @@ class CPU {
     }
   }
 
-  async step() {
+  halt() {
+    this.halted = true
+  }
+
+  step() {
     if (this.halted) {
       throw new Error(
         'A problem has been detected and Chip-8 has been shut down to prevent damage to your computer.'
@@ -94,7 +106,7 @@ class CPU {
     const instruction = this._decode(opcode)
 
     // Execute code based on the instruction set
-    await this._execute(instruction) // will remove opcode after debugging
+    this._execute(instruction)
   }
 
   _nextInstruction() {
@@ -125,7 +137,7 @@ class CPU {
     return Disassembler.disassemble(opcode)
   }
 
-  async _execute(instruction) {
+  _execute(instruction) {
     const id = instruction.instruction.id
     const args = instruction.args
 
@@ -138,7 +150,7 @@ class CPU {
         break
 
       case 'RET':
-        // 00EE - Return from a subroutine.
+        // 00EE - Return from a subroutine
         if (this.SP === -1) {
           this.halted = true
           throw new Error('Stack underflow.')
@@ -149,12 +161,12 @@ class CPU {
         break
 
       case 'JP_ADDR':
-        // 1nnn - Jump to location nnn.
+        // 1nnn - Jump to location nnn
         this.PC = args[0]
         break
 
       case 'CALL_ADDR':
-        // 2nnn - Call subroutine at nnn.
+        // 2nnn - Call subroutine at nnn
         if (this.SP === 15) {
           this.halted = true
           throw new Error('Stack overflow.')
@@ -166,7 +178,7 @@ class CPU {
         break
 
       case 'SE_VX_NN':
-        // 3xnn - Skip next instruction if Vx = nn.
+        // 3xnn - Skip next instruction if Vx = nn
         if (this.registers[args[0]] === args[1]) {
           this._skipInstruction()
         } else {
@@ -175,7 +187,7 @@ class CPU {
         break
 
       case 'SNE_VX_NN':
-        // 4xnn - Skip next instruction if Vx != nn.
+        // 4xnn - Skip next instruction if Vx != nn
         if (this.registers[args[0]] !== args[1]) {
           this._skipInstruction()
         } else {
@@ -184,7 +196,7 @@ class CPU {
         break
 
       case 'SE_VX_VY':
-        // 5xy0 - Skip next instruction if Vx = Vy.
+        // 5xy0 - Skip next instruction if Vx = Vy
         if (this.registers[args[0]] === this.registers[args[1]]) {
           this._skipInstruction()
         } else {
@@ -193,13 +205,13 @@ class CPU {
         break
 
       case 'LD_VX_NN':
-        // 6xnn - Set Vx = nn.
+        // 6xnn - Set Vx = nn
         this.registers[args[0]] = args[1]
         this._nextInstruction()
         break
 
       case 'ADD_VX_NN':
-        // 7xnn - Set Vx = Vx + nn.
+        // 7xnn - Set Vx = Vx + nn
         let v = this.registers[args[0]] + args[1]
         if (v > 255) {
           v -= 256
@@ -209,39 +221,39 @@ class CPU {
         break
 
       case 'LD_VX_VY':
-        // 8xy0 - Set Vx = Vy.
+        // 8xy0 - Set Vx = Vy
         this.registers[args[0]] = this.registers[args[1]]
         this._nextInstruction()
         break
 
       case 'OR_VX_VY':
-        // 8xy1 - Set Vx = Vx OR Vy.
+        // 8xy1 - Set Vx = Vx OR Vy
         this.registers[args[0]] |= this.registers[args[1]]
         this._nextInstruction()
         break
 
       case 'AND_VX_VY':
-        // 8xy2 - Set Vx = Vx AND Vy.
+        // 8xy2 - Set Vx = Vx AND Vy
         this.registers[args[0]] &= this.registers[args[1]]
         this._nextInstruction()
         break
 
       case 'XOR_VX_VY':
-        // 8xy3 - Set Vx = Vx XOR Vy.
+        // 8xy3 - Set Vx = Vx XOR Vy
         this.registers[args[0]] ^= this.registers[args[1]]
         this._nextInstruction()
         break
 
       case 'ADD_VX_VY':
-        // 8xy4 - Set Vx = Vx + Vy, set VF = carry.
-        this.registers[args[0]] += this.registers[args[1]]
+        // 8xy4 - Set Vx = Vx + Vy, set VF = carry
         this.registers[0xf] = this.registers[args[0]] + this.registers[args[1]] > 0xff ? 1 : 0
+        this.registers[args[0]] += this.registers[args[1]]
 
         this._nextInstruction()
         break
 
       case 'SUB_VX_VY':
-        // 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow.
+        // 8xy5 - Set Vx = Vx - Vy, set VF = NOT borrow
         this.registers[0xf] = this.registers[args[0]] > this.registers[args[1]] ? 1 : 0
         this.registers[args[0]] -= this.registers[args[1]]
 
@@ -249,14 +261,14 @@ class CPU {
         break
 
       case 'SHR_VX_VY':
-        // 8xy6 - Set Vx = Vx SHR 1.
+        // 8xy6 - Set Vx = Vx SHR 1
         this.registers[0xf] = this.registers[args[0]] & 1
         this.registers[args[0]] >>= 1
         this._nextInstruction()
         break
 
       case 'SUBN_VX_VY':
-        // 8xy7 - Set Vx = Vy - Vx, set VF = NOT borrow.
+        // 8xy7 - Set Vx = Vy - Vx, set VF = NOT borrow
         this.registers[0xf] = this.registers[args[1]] > this.registers[args[0]] ? 1 : 0
 
         this.registers[args[0]] = this.registers[args[1]] - this.registers[args[0]]
@@ -264,7 +276,7 @@ class CPU {
         break
 
       case 'SHL_VX_VY':
-        // 8xyE - Set Vx = Vx SHL 1.
+        // 8xyE - Set Vx = Vx SHL 1
         this.registers[0xf] = this.registers[args[0]] >> 7
 
         this.registers[args[0]] <<= 1
@@ -272,7 +284,7 @@ class CPU {
         break
 
       case 'SNE_VX_VY':
-        // 9xy0 - Skip next instruction if Vx != Vy.
+        // 9xy0 - Skip next instruction if Vx != Vy
         if (this.registers[args[0]] !== this.registers[args[1]]) {
           this._skipInstruction()
         } else {
@@ -281,25 +293,25 @@ class CPU {
         break
 
       case 'LD_I_ADDR':
-        // Annn - Set I = nnn.
+        // Annn - Set I = nnn
         this.I = args[1]
         this._nextInstruction()
         break
 
       case 'JP_V0_ADDR':
-        // Bnnn - Jump to location nnn + V0.
+        // Bnnn - Jump to location nnn + V0
         this.PC = this.registers[0] + args[1]
         break
 
       case 'RND_VX_NN':
-        // Cxnn - Set Vx = random byte AND nn.
+        // Cxnn - Set Vx = random byte AND nn
         let random = Math.floor(Math.random() * 0xff)
         this.registers[args[0]] = random & args[1]
         this._nextInstruction()
         break
 
       case 'DRW_VX_VY_N':
-        // Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+        // Dxyn - Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision
         if (this.I > 4095 - args[2]) {
           this.halted = true
           throw new Error('Memory out of bounds.')
@@ -308,7 +320,7 @@ class CPU {
         // If no pixels are erased, set VF to 0
         this.registers[0xf] = 0
 
-        // The interpreter reads n bytes from memory, starting at the address stored in I.
+        // The interpreter reads n bytes from memory, starting at the address stored in I
         for (let i = 0; i < args[2]; i++) {
           let line = this.memory[this.I + i]
           // Each byte is a line of eight pixels
@@ -329,7 +341,7 @@ class CPU {
         break
 
       case 'SKP_VX':
-        // Ex9E - Skip next instruction if key with the value of Vx is pressed.
+        // Ex9E - Skip next instruction if key with the value of Vx is pressed
         if (this.interface.getKeys() & (1 << this.registers[args[0]])) {
           this._skipInstruction()
         } else {
@@ -338,7 +350,7 @@ class CPU {
         break
 
       case 'SKNP_VX':
-        // ExA1 - Skip next instruction if key with the value of Vx is not pressed.
+        // ExA1 - Skip next instruction if key with the value of Vx is not pressed
         if (!(this.interface.getKeys() & (1 << this.registers[args[0]]))) {
           this._skipInstruction()
         } else {
@@ -347,25 +359,31 @@ class CPU {
         break
 
       case 'LD_VX_DT':
-        // Fx07 - Set Vx = delay timer value.
+        // Fx07 - Set Vx = delay timer value
         this.registers[args[0]] = this.DT
         this._nextInstruction()
         break
 
       case 'LD_VX_N':
-        // Fx0A - Wait for a key press, store the value of the key in Vx.
-        this.registers[args[0]] = await this.interface.waitKey()
+        // Fx0A - Wait for a key press, store the value of the key in Vx
+        const keyPress = this.interface.waitKey()
+
+        if (!keyPress) {
+          return
+        }
+
+        this.registers[args[0]] = keyPress
         this._nextInstruction()
         break
 
       case 'LD_DT_VX':
-        // Fx15 - Set delay timer = Vx.
+        // Fx15 - Set delay timer = Vx
         this.DT = this.registers[args[1]]
         this._nextInstruction()
         break
 
       case 'LD_ST_VX':
-        // Fx18 - Set sound timer = Vx.
+        // Fx18 - Set sound timer = Vx
         this.ST = this.registers[args[1]]
         if (this.ST > 0) {
           this.soundEnabled = true
@@ -375,13 +393,13 @@ class CPU {
         break
 
       case 'ADD_I_VX':
-        // Fx1E - Set I = I + Vx.
+        // Fx1E - Set I = I + Vx
         this.I = this.I + this.registers[args[1]]
         this._nextInstruction()
         break
 
       case 'LD_F_VX':
-        // Fx29 - Set I = location of sprite for digit Vx.
+        // Fx29 - Set I = location of sprite for digit Vx
         if (this.registers[args[1]] > 0xf) {
           this.halted = true
           throw new Error('Invalid digit.')
@@ -392,9 +410,9 @@ class CPU {
         break
 
       case 'LD_B_VX':
-        // Fx33 - Store BCD representation of Vx in memory locations I, I+1, and I+2.
+        // Fx33 - Store BCD representation of Vx in memory locations I, I+1, and I+2
         // BCD means binary-coded decimal
-        // If VX is 0xef, or 239, we want 2, 3, and 9 in I, I+1, and I+2.
+        // If VX is 0xef, or 239, we want 2, 3, and 9 in I, I+1, and I+2
         if (this.I > 4093) {
           this.halted = true
           throw new Error('Memory out of bounds.')
@@ -415,7 +433,7 @@ class CPU {
         break
 
       case 'LD_I_VX':
-        // Fx55 - Store registers V0 through Vx in memory starting at location I.
+        // Fx55 - Store registers V0 through Vx in memory starting at location I
         if (this.I > 4095 - args[1]) {
           this.halted = true
           throw new Error('Memory out of bounds.')
@@ -429,7 +447,7 @@ class CPU {
         break
 
       case 'LD_VX_I':
-        // Fx65 - Read registers V0 through Vx from memory starting at location I.
+        // Fx65 - Read registers V0 through Vx from memory starting at location I
         if (this.I > 4095 - args[0]) {
           this.halted = true
           throw new Error('Memory out of bounds.')
@@ -441,6 +459,7 @@ class CPU {
 
         this._nextInstruction()
         break
+
       default:
         // Data word
         this.halted = true
@@ -456,6 +475,11 @@ module.exports = {
 },{"../data/constants":6,"../data/fontSet":7,"./Disassembler":2}],2:[function(require,module,exports){
 const { INSTRUCTION_SET } = require('../data/instructionSet')
 
+/**
+ * Disassembler
+ *
+ * Decode 16-bit (2 byte) opcodes to get instructions for the CPU.
+ */
 const Disassembler = {
   disassemble(opcode) {
     // Find the instruction in which the opcode & mask equals the pattern
@@ -529,6 +553,7 @@ const Disassembler = {
     return formattedInstruction
   },
 
+  // For debugging
   dump(data) {
     const lines = data.map((code, i) => {
       const address = (i * 2).toString(16).padStart(6, '0')
@@ -545,6 +570,11 @@ const Disassembler = {
 module.exports = Disassembler
 
 },{"../data/instructionSet":8}],3:[function(require,module,exports){
+/**
+ * RomBuffer
+ *
+ * Produce ROM data from a raw binary.
+ */
 class RomBuffer {
   /**
    * @param {binary} fileContents ROM binary
@@ -561,6 +591,7 @@ class RomBuffer {
     }
   }
 
+  // Hex dump for debugging
   dump() {
     let lines = []
 
@@ -581,6 +612,11 @@ module.exports = {
 }
 
 },{}],4:[function(require,module,exports){
+/**
+ * CpuInterface
+ *
+ * An abstract class that all other CPU interfaces extend from.
+ */
 class CpuInterface {
   constructor() {
     if (new.target === CpuInterface) {
@@ -588,11 +624,8 @@ class CpuInterface {
     }
   }
 
+  // All interfaces
   clearDisplay() {
-    throw new TypeError('Must be implemented on the inherited class.')
-  }
-
-  renderDisplay() {
     throw new TypeError('Must be implemented on the inherited class.')
   }
 
@@ -615,76 +648,159 @@ class CpuInterface {
   disableSound() {
     throw new TypeError('Must be implemented on the inherited class.')
   }
+
+  // Native interface only
+  setKeys() {
+    throw new TypeError('Must be implemented on the inherited class.')
+  }
+
+  resetKeys() {
+    throw new TypeError('Must be implemented on the inherited class.')
+  }
 }
 
-module.exports = {
-  CpuInterface,
-}
+module.exports = { CpuInterface }
 
 },{}],5:[function(require,module,exports){
 const { CpuInterface } = require('./CpuInterface')
 const { DISPLAY_HEIGHT, DISPLAY_WIDTH, COLOR } = require('../../data/constants')
 const keyMap = require('../../data/keyMap')
 
-class DOMCpuInterface extends CpuInterface {
+/**
+ * WebCpuInterface
+ *
+ * A CPU interface for the web using DOM events and HTML5 canvas.
+ */
+class WebCpuInterface extends CpuInterface {
   constructor() {
     super()
 
-    this.frameBuffer = this.createFrameBuffer()
-
-    this.canvas = document.querySelector('canvas')
+    // Screen
+    this.frameBuffer = this._createFrameBuffer()
+    this.screen = document.querySelector('canvas')
     this.multiplier = 10
-    this.canvas.width = DISPLAY_WIDTH * this.multiplier
-    this.canvas.height = DISPLAY_HEIGHT * this.multiplier
-
-    this.context = this.canvas.getContext('2d')
-
+    this.screen.width = DISPLAY_WIDTH * this.multiplier
+    this.screen.height = DISPLAY_HEIGHT * this.multiplier
+    this.context = this.screen.getContext('2d')
     this.context.fillStyle = 'black'
-    this.context.fillRect(0, 0, this.canvas.width, this.canvas.height)
+    this.context.fillRect(0, 0, this.screen.width, this.screen.height)
 
-    this.soundEnabled = false
+    // Keys
     this.keys = 0
-    this.resolveKey = null
+    this.keyPressed = undefined
+
+    // Sound
+    this.soundEnabled = false
+
+    if ('AudioContext' in window || 'webkitAudioContext' in window) {
+      this.audioContext = new (AudioContext || webkitAudioContext)()
+
+      this.masterGain = new GainNode(this.audioContext)
+      this.masterGain.gain.value = 0.3
+      this.masterGain.connect(this.audioContext.destination)
+
+      let soundEnabled = false
+      let oscillator
+      Object.defineProperties(this, {
+        soundEnabled: {
+          get: function() { return soundEnabled },
+          set: function(value) {
+            value = Boolean(value)
+            if (value !== soundEnabled) {
+              soundEnabled = value
+              if (soundEnabled) {
+                oscillator = new OscillatorNode(this.audioContext, {
+                  type: 'square'
+                })
+                oscillator.connect(this.masterGain)
+                oscillator.start()
+              } else {
+                oscillator.stop()
+              }
+            }
+          }
+        }
+      })
+
+      // Interface for muting sound
+      const muteInstructions = document.createElement('pre')
+      muteInstructions.classList.add('instructions')
+      muteInstructions.innerText = 'M = toggle sound '
+
+      const muteIcon = document.createElement('span')
+      muteIcon.innerText = '🔊'
+
+      muteInstructions.append(muteIcon)
+      document
+        .querySelector('.instructions')
+        .insertAdjacentElement('afterend', muteInstructions)
+
+      let muted = false
+      document.addEventListener('keydown', event => {
+        if (event.key.toLowerCase() === 'm') {
+          muted = !muted
+          muteIcon.innerText = muted ? '🔇' : '🔊'
+          this.masterGain.gain.value = muted ? 0 : 0.3
+        }
+      })
+    }
+
+    // =========================================================================
+    // Key Down Event
+    // =========================================================================
 
     document.addEventListener('keydown', event => {
-      this.mapKey(event.key)
+      const keyIndex = keyMap.indexOf(event.key)
+
+      if (keyIndex > -1) {
+        this._setKeys(keyIndex)
+      }
     })
+
+    // =========================================================================
+    // Key Up Event
+    // =========================================================================
 
     document.addEventListener('keyup', event => {
-      this.keys = 0
+      this._resetKeys()
     })
   }
 
-  mapKey(key) {
-    let keyMask
-
-    if (keyMap.includes(key)) {
-      keyMask = 1 << keyMap.indexOf(key)
-
-      this.keys = this.keys | keyMask
-
-      if (this.resolveKey) {
-        this.resolveKey(keyMap.indexOf(key))
-        this.resolveKey = null
-      }
-    }
-  }
-
-  clearDisplay() {
-    this.frameBuffer = this.createFrameBuffer()
-    this.context.fillStyle = 'black'
-    this.context.fillRect(0, 0, this.canvas.width, this.canvas.height)
-  }
-
-  createFrameBuffer() {
+  _createFrameBuffer() {
     let frameBuffer = []
+
     for (let i = 0; i < DISPLAY_WIDTH; i++) {
       frameBuffer.push([])
       for (let j = 0; j < DISPLAY_HEIGHT; j++) {
         frameBuffer[i].push(0)
       }
     }
+
     return frameBuffer
+  }
+
+  _setKeys(keyIndex) {
+    let keyMask = 1 << keyIndex
+
+    this.keys = this.keys | keyMask
+    this.keyPressed = keyIndex
+  }
+
+  _resetKeys() {
+    this.keys = 0
+    this.keyPressed = undefined
+  }
+
+  waitKey() {
+    // Get and reset key
+    const keyPressed = this.keyPressed
+    this.keyPressed = undefined
+
+    return keyPressed
+  }
+
+  getKeys() {
+    return this.keys
   }
 
   drawPixel(x, y, value) {
@@ -714,14 +830,10 @@ class DOMCpuInterface extends CpuInterface {
     return collision
   }
 
-  waitKey() {
-    return new Promise(resolve => {
-      this.resolveKey = resolve
-    })
-  }
-
-  getKeys() {
-    return this.keys
+  clearDisplay() {
+    this.frameBuffer = this._createFrameBuffer()
+    this.context.fillStyle = 'black'
+    this.context.fillRect(0, 0, this.screen.width, this.screen.height)
   }
 
   enableSound() {
@@ -734,7 +846,7 @@ class DOMCpuInterface extends CpuInterface {
 }
 
 module.exports = {
-  DOMCpuInterface,
+  WebCpuInterface,
 }
 
 },{"../../data/constants":6,"../../data/keyMap":9,"./CpuInterface":4}],6:[function(require,module,exports){
@@ -1142,12 +1254,15 @@ module.exports = keyMap
 (function (global){
 const { CPU } = require('../classes/CPU')
 const { RomBuffer } = require('../classes/RomBuffer')
-const { DOMCpuInterface } = require('../classes/interfaces/DOMCpuInterface')
-const cpuInterface = new DOMCpuInterface()
+const { WebCpuInterface } = require('../classes/interfaces/WebCpuInterface')
+
+const cpuInterface = new WebCpuInterface()
 const cpu = new CPU(cpuInterface)
 
+// Set CPU and Rom Buffer to the global object, which will become window in the
+// browser after bundling.
 global.cpu = cpu
 global.RomBuffer = RomBuffer
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../classes/CPU":1,"../classes/RomBuffer":3,"../classes/interfaces/DOMCpuInterface":5}]},{},[10]);
+},{"../classes/CPU":1,"../classes/RomBuffer":3,"../classes/interfaces/WebCpuInterface":5}]},{},[10]);

@@ -1,3 +1,8 @@
+/**
+ * RomBuffer
+ *
+ * Produce ROM data from a raw binary.
+ */
 class RomBuffer {
   /**
    * @param {binary} fileContents ROM binary
@@ -14,6 +19,7 @@ class RomBuffer {
     }
   }
 
+  // Hex dump for debugging
   dump() {
     let lines = []
 
